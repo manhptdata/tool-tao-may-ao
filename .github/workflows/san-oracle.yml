@@ -9,7 +9,10 @@ on:
 jobs:
   snipe-oci:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 10
+    env:
+      SUPPRESS_LABEL_WARNING: "True"
+      OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING: "True"
     steps:
       - name: Cai dat OCI CLI
         run: |
@@ -31,6 +34,7 @@ jobs:
           region=ap-singapore-1
           key_file=~/.oci/oci_api_key.pem
           EOF
+          chmod 600 ~/.oci/config
 
       - name: Chay vong lap san may ao ManhPT-server
         run: |
@@ -41,8 +45,8 @@ jobs:
 
           echo "Tim thay Stack ID: $STACK_ID"
 
-          # Chay 4 luot moi phien (tong ~4 phut)
-          for i in {1..4}; do
+          # Chay 3 luot moi phien (tong ~4 phut, luon ket thuc xanh sach)
+          for i in {1..3}; do
             echo "--- Luot thu $i luc $(date) ---"
             JOB_ID=$(oci resource-manager job create-apply-job \
               --stack-id "$STACK_ID" \
@@ -58,7 +62,13 @@ jobs:
                 exit 0
               fi
             else
-              echo "Job truoc chua xong hoac bi gioi han toc do, doi 50s..."
+              echo "Job truoc chua xong hoac bi gioi han toc do, doi 30s..."
+              sleep 30
+              continue
             fi
-            sleep 25
+
+            # Khong can nghi o luot cuoi de ket thuc nhanh
+            if [ "$i" -lt 3 ]; then
+              sleep 25
+            fi
           done
