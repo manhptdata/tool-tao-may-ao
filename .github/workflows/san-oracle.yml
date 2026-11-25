@@ -1,0 +1,64 @@
+name: San Slot Oracle Cloud Singapore
+
+on:
+  schedule:
+    # Tự động kích hoạt mỗi 5 phút 24/24
+    - cron: '*/5 * * * *'
+  workflow_dispatch: # Cho phép bấm nút chạy tay bất cứ lúc nào
+
+jobs:
+  snipe-oci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Cai dat OCI CLI
+        run: |
+          pip install --quiet oci-cli
+
+      - name: Cau hinh xac thuc Oracle Cloud
+        run: |
+          mkdir -p ~/.oci
+          cat << 'EOF' > ~/.oci/oci_api_key.pem
+          ${{ secrets.OCI_KEY_CONTENT }}
+          EOF
+          chmod 600 ~/.oci/oci_api_key.pem
+
+          cat << 'EOF' > ~/.oci/config
+          [DEFAULT]
+          user=${{ secrets.OCI_USER_OCID }}
+          fingerprint=${{ secrets.OCI_FINGERPRINT }}
+          tenancy=ocid1.tenancy.oc1..aaaaaaaaqlao45zdoytkfcumlxlb3bhy5x4htjs4ibqutl52irxisrex6f7q
+          region=ap-singapore-1
+          key_file=~/.oci/oci_api_key.pem
+          EOF
+
+      - name: Chay vong lap san may ao ManhPT-server
+        run: |
+          STACK_ID=$(oci resource-manager stack list \
+            --compartment-id "ocid1.tenancy.oc1..aaaaaaaaqlao45zdoytkfcumlxlb3bhy5x4htjs4ibqutl52irxisrex6f7q" \
+            --display-name "ManhPT-server" \
+            --query "data[0].id" --raw-output)
+
+          echo "Tim thay Stack ID: $STACK_ID"
+
+          # Chay 4 luot moi phien (tong ~4 phut)
+          for i in {1..4}; do
+            echo "--- Luot thu $i luc $(date) ---"
+            JOB_ID=$(oci resource-manager job create-apply-job \
+              --stack-id "$STACK_ID" \
+              --execution-plan-strategy AUTO_APPROVED \
+              --query "data.id" --raw-output 2>/dev/null || true)
+
+            if [ -n "$JOB_ID" ]; then
+              sleep 40
+              STATUS=$(oci resource-manager job get --job-id "$JOB_ID" --query "data.\"lifecycle-state\"" --raw-output)
+              echo "Trang thai Job: $STATUS"
+              if [ "$STATUS" = "SUCCEEDED" ]; then
+                echo "TAO MAY THANH CONG! HAY VAO ORACLE CLOUD KIEM TRA VA TAT WORKFLOW NAY!"
+                exit 0
+              fi
+            else
+              echo "Job truoc chua xong hoac bi gioi han toc do, doi 50s..."
+            fi
+            sleep 50
+          done
