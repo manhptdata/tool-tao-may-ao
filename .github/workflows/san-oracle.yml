@@ -9,7 +9,7 @@ on:
 jobs:
   snipe-oci:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 6
     steps:
       - name: Cai dat OCI CLI
         run: |
@@ -60,5 +60,5 @@ jobs:
             else
               echo "Job truoc chua xong hoac bi gioi han toc do, doi 50s..."
             fi
-            sleep 50
+            sleep 25
           done
