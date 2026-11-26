@@ -42,7 +42,8 @@ jobs:
             --display-name "ManhPT-server" \
             --query "data[0].id" --raw-output)
 
-          echo "Tim thay Stack ID: $STACK_ID"
+           
+          echo "Da tim thay Stack thanh cong"
           echo "--- Bat dau luc $(date) ---"
 
           JOB_ID=$(oci resource-manager job create-apply-job \
