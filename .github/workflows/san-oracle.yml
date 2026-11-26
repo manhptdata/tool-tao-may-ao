@@ -49,7 +49,7 @@ jobs:
 
           echo "Da tim thay Stack thanh cong. Bat dau san..."
 
-          for i in 1 2 3; do
+          for i in 1 2; do
             echo "--- Luot $i luc $(date -u '+%H:%M:%S UTC') ---"
             JOB_ID=$(oci resource-manager job create-apply-job \
               --stack-id "$STACK_ID" \
@@ -73,7 +73,7 @@ jobs:
               echo "Khong tao duoc Job trong luot $i."
             fi
 
-            if [ "$i" -lt 3 ]; then
-              sleep 110
+            if [ "$i" -lt 2 ]; then
+              sleep 180
             fi
           done
