@@ -35,45 +35,39 @@ jobs:
           EOF
           chmod 600 ~/.oci/config
 
-      - name: San may ao ManhPT-server (2 luot/phien)
+      - name: San may ao ManhPT-server qua Compute API (90s/luot)
         run: |
-          STACK_ID=$(oci resource-manager stack list \
-            --compartment-id "${{ secrets.OCI_TENANCY_OCID }}" \
-            --display-name "ManhPT-server" \
-            --query "data[0].id" --raw-output)
+          echo "${{ secrets.OCI_SSH_PUBLIC_KEY }}" > /tmp/oci_ssh.pub
+          echo "Bat dau san Compute API tren ${{ secrets.OCI_AD }}..."
 
-          if [ -z "$STACK_ID" ] || [ "$STACK_ID" = "null" ]; then
-            echo "Loi: Khong tim thay Stack. Kiem tra lai Secrets."
-            exit 1
-          fi
-
-          echo "Da tim thay Stack thanh cong. Bat dau san..."
-
-          for i in 1 2; do
+          for i in 1 2 3 4 5 6; do
             echo "--- Luot $i luc $(date -u '+%H:%M:%S UTC') ---"
-            JOB_ID=$(oci resource-manager job create-apply-job \
-              --stack-id "$STACK_ID" \
-              --execution-plan-strategy AUTO_APPROVED \
-              --query "data.id" --raw-output || true)
+            OUT=$(oci compute instance launch \
+              --no-retry \
+              --availability-domain "${{ secrets.OCI_AD }}" \
+              --compartment-id "${{ secrets.OCI_TENANCY_OCID }}" \
+              --shape "VM.Standard.A1.Flex" \
+              --shape-config '{"ocpus":2,"memoryInGBs":12}' \
+              --subnet-id "${{ secrets.OCI_SUBNET_ID }}" \
+              --image-id "${{ secrets.OCI_IMAGE_ID }}" \
+              --display-name "ManhPT-server" \
+              --assign-public-ip true \
+              --boot-volume-size-in-gbs 100 \
+              --ssh-authorized-keys-file /tmp/oci_ssh.pub 2>&1 || true)
 
-            if [ -n "$JOB_ID" ] && [ "$JOB_ID" != "null" ]; then
-              echo "Da tao Job: $JOB_ID"
-              sleep 45
-              STATUS=$(oci resource-manager job get --job-id "$JOB_ID" --query "data.\"lifecycle-state\"" --raw-output)
-              echo "Trang thai Job: $STATUS"
-
-              if [ "$STATUS" = "SUCCEEDED" ]; then
-                echo "TAO MAY THANH CONG! HAY VAO ORACLE CLOUD KIEM TRA VA TAT CRON JOB!"
-                curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-                  -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-                  -d text="DA SAN DUOC MAY AO MANHPT-SERVER TREN ORACLE CLOUD! Vao tat cron-job.org ngay." > /dev/null
-                break
-              fi
+            if echo "$OUT" | grep -q "ocid1.instance."; then
+              echo "TAO MAY THANH CONG! VAO ORACLE CLOUD KIEM TRA VA TAT CRON JOB!"
+              curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+                -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+                -d text="DA SAN DUOC MAY AO MANHPT-SERVER TREN ORACLE CLOUD! Vao tat cron-job.org ngay." > /dev/null
+              break
+            elif echo "$OUT" | grep -q "Out of host capacity"; then
+              echo "Het slot (Out of host capacity). Cho 90s..."
             else
-              echo "Khong tao duoc Job trong luot $i."
+              echo "Phan hoi khac: $OUT"
             fi
 
-            if [ "$i" -lt 2 ]; then
-              sleep 180
+            if [ "$i" -lt 6 ]; then
+              sleep 90
             fi
           done
