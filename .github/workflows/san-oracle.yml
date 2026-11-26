@@ -3,13 +3,13 @@ name: San Slot Oracle Cloud Singapore
 on:
   #schedule:
     # Tự động chạy mỗi 10 phút 24/24
-   # - cron: '*/10 * * * *'
+    #- cron: '*/10 * * * *'
   workflow_dispatch:
 
 jobs:
   snipe-oci:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     env:
       SUPPRESS_LABEL_WARNING: "True"
       OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING: "True"
@@ -35,30 +35,42 @@ jobs:
           EOF
           chmod 600 ~/.oci/config
 
-      - name: San may ao ManhPT-server (1 luot/phien)
+      - name: San may ao ManhPT-server (3 luot/phien)
         run: |
           STACK_ID=$(oci resource-manager stack list \
             --compartment-id "${{ secrets.OCI_TENANCY_OCID }}" \
             --display-name "ManhPT-server" \
             --query "data[0].id" --raw-output)
 
-           
-          echo "Da tim thay Stack thanh cong"
-          echo "--- Bat dau luc $(date) ---"
-
-          JOB_ID=$(oci resource-manager job create-apply-job \
-            --stack-id "$STACK_ID" \
-            --execution-plan-strategy AUTO_APPROVED \
-            --query "data.id" --raw-output || true)
-
-          if [ -n "$JOB_ID" ]; then
-            echo "Da tao Job: $JOB_ID"
-            sleep 45
-            STATUS=$(oci resource-manager job get --job-id "$JOB_ID" --query "data.\"lifecycle-state\"" --raw-output)
-            echo "Trang thai Job: $STATUS"
-            if [ "$STATUS" = "SUCCEEDED" ]; then
-              echo "TAO MAY THANH CONG! HAY VAO ORACLE CLOUD KIEM TRA VA TAT WORKFLOW NAY!"
-            fi
-          else
-            echo "Khong tao duoc Job trong luot nay."
+          if [ -z "$STACK_ID" ] || [ "$STACK_ID" = "null" ]; then
+            echo "Loi: Khong tim thay Stack. Kiem tra lai Secrets."
+            exit 1
           fi
+
+          echo "Da tim thay Stack thanh cong. Bat dau san..."
+
+          for i in 1 2 3; do
+            echo "--- Luot $i luc $(date -u '+%H:%M:%S UTC') ---"
+            JOB_ID=$(oci resource-manager job create-apply-job \
+              --stack-id "$STACK_ID" \
+              --execution-plan-strategy AUTO_APPROVED \
+              --query "data.id" --raw-output || true)
+
+            if [ -n "$JOB_ID" ] && [ "$JOB_ID" != "null" ]; then
+              echo "Da tao Job: $JOB_ID"
+              sleep 45
+              STATUS=$(oci resource-manager job get --job-id "$JOB_ID" --query "data.\"lifecycle-state\"" --raw-output)
+              echo "Trang thai Job: $STATUS"
+
+              if [ "$STATUS" = "SUCCEEDED" ]; then
+                echo "TAO MAY THANH CONG! HAY VAO ORACLE CLOUD KIEM TRA VA TAT CRON JOB!"
+                break
+              fi
+            else
+              echo "Khong tao duoc Job trong luot $i."
+            fi
+
+            if [ "$i" -lt 3 ]; then
+              sleep 110
+            fi
+          done
