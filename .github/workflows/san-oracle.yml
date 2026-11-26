@@ -64,6 +64,9 @@ jobs:
 
               if [ "$STATUS" = "SUCCEEDED" ]; then
                 echo "TAO MAY THANH CONG! HAY VAO ORACLE CLOUD KIEM TRA VA TAT CRON JOB!"
+                curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+                  -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+                  -d text="DA SAN DUOC MAY AO MANHPT-SERVER TREN ORACLE CLOUD! Vao tat cron-job.org ngay." > /dev/null
                 break
               fi
             else
