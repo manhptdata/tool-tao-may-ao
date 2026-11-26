@@ -35,7 +35,7 @@ jobs:
           EOF
           chmod 600 ~/.oci/config
 
-      - name: San may ao ManhPT-server (3 luot/phien)
+      - name: San may ao ManhPT-server (2 luot/phien)
         run: |
           STACK_ID=$(oci resource-manager stack list \
             --compartment-id "${{ secrets.OCI_TENANCY_OCID }}" \
